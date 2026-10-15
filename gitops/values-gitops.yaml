@@ -2,7 +2,7 @@
 # Change these by pushing code, not by editing this file by hand.
 backend:
   image:
-    tag: "pending-first-pipeline-run"
+    tag: "8baee138a443ca8add7dd9a0a10c6969451bd54b"
 frontend:
   image:
-    tag: "pending-first-pipeline-run"
+    tag: "8baee138a443ca8add7dd9a0a10c6969451bd54b"
