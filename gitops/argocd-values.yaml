@@ -1,0 +1,16 @@
+# Argo CD (argo/argo-cd Helm chart) for the local kind cluster.
+#   helm upgrade --install argocd argo/argo-cd -n argocd --create-namespace -f gitops/argocd-values.yaml
+configs:
+  params:
+    server.insecure: true        # TLS ends at ingress-nginx; Argo CD itself serves plain HTTP
+  cm:
+    timeout.reconciliation: 60s  # poll Git every minute (no webhook into a laptop cluster)
+server:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: argocd.clinicflow.local
+dex:
+  enabled: false                 # local admin login only
+notifications:
+  enabled: false

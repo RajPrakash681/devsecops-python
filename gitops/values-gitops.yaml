@@ -1,0 +1,8 @@
+# Written by the CI pipeline (job "Promote to GitOps"): the image tags Argo CD deploys.
+# Change these by pushing code, not by editing this file by hand.
+backend:
+  image:
+    tag: "pending-first-pipeline-run"
+frontend:
+  image:
+    tag: "pending-first-pipeline-run"

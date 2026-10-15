@@ -1,0 +1,39 @@
+# GitOps: Argo CD keeps the cluster equal to this repository.
+#   kubectl apply -f gitops/argocd-application.yaml
+#
+# Flow: push to main -> GitHub Actions tests, scans and pushes clinicflow-*:<sha> to GHCR ->
+# the pipeline commits the new SHA into gitops/values-gitops.yaml -> Argo CD sees the commit,
+# renders helm/clinicflow with those values and rolls the Deployments. Nobody runs kubectl apply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clinicflow
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/RajPrakash681/devsecops-python.git
+    targetRevision: main
+    path: helm/clinicflow
+    helm:
+      releaseName: clinicflow
+      valueFiles:
+        - ../../gitops/values-gitops.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: clinicflow
+  syncPolicy:
+    automated:
+      prune: true        # objects removed from Git are removed from the cluster
+      selfHeal: true     # manual kubectl edits are reverted to what Git says
+    syncOptions: [CreateNamespace=false]
+    retry:
+      limit: 3
+      backoff: { duration: 10s, factor: 2 }
+  ignoreDifferences:
+    # the HPA owns the backend replica count
+    - group: apps
+      kind: Deployment
+      name: clinicflow-backend
+      jsonPointers: [/spec/replicas]
