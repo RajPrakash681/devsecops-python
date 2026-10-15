@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (git-ignored) and adjust. No credentials belong here:
+# Terraform reads them from `aws configure`, AWS_PROFILE or SSO.
+aws_region         = "ap-south-1"
+owner              = "your-name"
+cluster_name       = "clinicflow-eks"
+kubernetes_version = "1.34"
+
+# Your public IP only: curl -s https://checkip.amazonaws.com
+api_allowed_cidrs = ["203.0.113.10/32"]
+
+# Set false if the account has no spare Elastic IP (nodes then run in the public subnets).
+enable_nat_gateway = true
+
+node_instance_types = ["t3.medium"]
+node_desired_size   = 2
+node_min_size       = 1
+node_max_size       = 3

@@ -1,4 +1,10 @@
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
+*.tfvars
+!terraform.tfvars.example
+tfplan
+*.tfplan
+crash.log
+# the emulator provider override is copied in by emulator/run.sh and must never be committed
+*_override.tf
