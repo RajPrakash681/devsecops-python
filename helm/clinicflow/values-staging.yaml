@@ -1,0 +1,13 @@
+# Staging on the shared kind cluster: its own hostname, a fixed 2 replicas per tier, and no
+# Prometheus objects (the dashboards and alerts watch production).
+backend:
+  env:
+    APP_ENV: staging
+  autoscaling: { enabled: false }
+  replicaCount: 2
+frontend:
+  replicaCount: 2
+ingress:
+  host: staging.clinicflow.local
+monitoring:
+  enabled: false

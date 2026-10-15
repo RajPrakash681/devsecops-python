@@ -1,11 +1,25 @@
-# Bootstrap: the application namespace. Helm installs everything else into it.
+# Bootstrap: the application namespaces. Everything else is installed into them.
 #   kubectl apply -f k8s/namespace.yaml
+#
+#   clinicflow          production - owned by Argo CD (gitops/argocd-application.yaml)
+#   clinicflow-staging  staging    - installed by hand with `helm upgrade --install` (README section 12)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: clinicflow
   labels:
     app.kubernetes.io/part-of: clinicflow
+    environment: production
     # Pod Security Admission: reject any pod that runs as root or asks for extra privileges.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicflow-staging
+  labels:
+    app.kubernetes.io/part-of: clinicflow
+    environment: staging
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
