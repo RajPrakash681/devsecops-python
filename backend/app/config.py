@@ -25,8 +25,9 @@ APP_ENV = os.environ.get("APP_ENV", "dev")
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 CORS_ORIGINS = [o for o in os.environ.get("CORS_ORIGINS", "").split(",") if o]
 
+# Morning and evening OPD, 08:00-21:00 by default.
 # Appointment times are stored as clinic-local wall-clock time; "today" is the clinic's today.
 CLINIC_TZ = ZoneInfo(os.environ.get("CLINIC_TZ", "Asia/Kolkata"))
-OPENING_HOUR = int(os.environ.get("CLINIC_OPENING_HOUR", "9"))
-CLOSING_HOUR = int(os.environ.get("CLINIC_CLOSING_HOUR", "18"))
+OPENING_HOUR = int(os.environ.get("CLINIC_OPENING_HOUR", "8"))
+CLOSING_HOUR = int(os.environ.get("CLINIC_CLOSING_HOUR", "21"))
 SLOT_MINUTES = int(os.environ.get("CLINIC_SLOT_MINUTES", "30"))

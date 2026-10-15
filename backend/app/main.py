@@ -131,7 +131,8 @@ def ready(response: Response, db: Session = Depends(get_db)):
 @app.get("/api/info", response_model=Info, tags=["ops"])
 def info():
     """Which build is answering, and from which pod (used by the smoke test and the GitOps demo)."""
-    return Info(service="clinicflow-api", version=APP_VERSION, environment=APP_ENV, pod=socket.gethostname())
+    return Info(service="clinicflow-api", version=APP_VERSION, environment=APP_ENV, pod=socket.gethostname(),
+                opening_hour=OPENING_HOUR, closing_hour=CLOSING_HOUR, slot_minutes=SLOT_MINUTES)
 
 
 # --- doctors ---------------------------------------------------------------------------------------

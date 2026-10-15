@@ -97,3 +97,6 @@ class Info(BaseModel):
     version: str
     environment: str
     pod: str
+    opening_hour: int
+    closing_hour: int
+    slot_minutes: int

@@ -27,6 +27,7 @@ def test_ready_when_schema_is_migrated(client):
 def test_info_reports_build_and_pod(client):
     body = client.get("/api/info").json()
     assert body["service"] == "clinicflow-api" and body["pod"]
+    assert (body["opening_hour"], body["closing_hour"], body["slot_minutes"]) == (8, 21, 30)
 
 
 # --- doctors -----------------------------------------------------------------------------------
@@ -93,8 +94,8 @@ def test_cancelled_slot_can_be_rebooked(client, make_doctor, book):
 
 def test_outside_opening_hours_and_inactive_or_unknown_doctor(make_doctor, book):
     doc = make_doctor()
-    book(doc["id"], at("08:30"), expect=422)
-    book(doc["id"], at("17:45"), expect=422)          # would end 18:15, after closing
+    book(doc["id"], at("07:30"), expect=422)
+    book(doc["id"], at("20:45"), expect=422)          # would end 21:15, after closing
     off = make_doctor("Dr. On Leave", active=False)
     book(off["id"], at("10:00"), expect=409)
     book(9999, at("10:00"), expect=404)
@@ -131,7 +132,7 @@ def test_free_slots(client, make_doctor, book):
     doc = make_doctor()
     book(doc["id"], at("10:00"), duration_min=60)
     slots = {s["starts_at"][11:16]: s["available"] for s in client.get(f"/api/doctors/{doc['id']}/slots?date={TOMORROW}").json()}
-    assert len(slots) == 18 and slots["09:30"] and not slots["10:00"] and not slots["10:30"] and slots["11:00"]
+    assert len(slots) == 26 and slots["09:30"] and not slots["10:00"] and not slots["10:30"] and slots["11:00"]
     past = client.get(f"/api/doctors/{doc['id']}/slots?date={YESTERDAY}").json()
     assert not any(s["available"] for s in past)
 
@@ -211,7 +212,7 @@ def test_stats_for_a_day(client, make_doctor, book):
     assert s["total_today"] == 3 and s["waiting_now"] == 1
     assert s["by_status"] == {"BOOKED": 1, "CHECKED_IN": 1, "COMPLETED": 0, "CANCELLED": 1, "NO_SHOW": 0}
     per_doc = {d["doctor_name"]: (d["booked"], d["utilization"]) for d in s["doctors"]}
-    assert per_doc == {"Dr. Meera Iyer": (2, round(90 / 540, 3)), "Dr. Kabir Rao": (0, 0.0)}
+    assert per_doc == {"Dr. Meera Iyer": (2, round(90 / 780, 3)), "Dr. Kabir Rao": (0, 0.0)}
 
 
 def test_no_show_rate_over_last_30_days(client, make_doctor, book):
