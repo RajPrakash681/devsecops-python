@@ -1,0 +1,2 @@
+# Python SAST for the FastAPI backend. The severity gate (-ll = MEDIUM and above) is set in CI.
+exclude_dirs: ["tests", "alembic/versions", ".venv"]

@@ -1,0 +1,25 @@
+# Lab 1 - the SMS reminder service never starts. Find out why from the cluster alone.
+#   kubectl apply -f troubleshooting/lab1-broken-image.yaml
+#   kubectl get pods -n clinicflow-lab ; kubectl describe pod -n clinicflow-lab -l app=sms-reminders
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicflow-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sms-reminders
+  namespace: clinicflow-lab
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: sms-reminders }
+  template:
+    metadata:
+      labels: { app: sms-reminders }
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.29-alpnie
+          ports: [{ name: http, containerPort: 8080 }]

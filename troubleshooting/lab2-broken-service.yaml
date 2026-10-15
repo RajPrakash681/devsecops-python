@@ -1,0 +1,36 @@
+# Lab 2 - every pod of the patient portal is Running and Ready, yet the Service answers nothing.
+#   kubectl apply -f troubleshooting/lab2-broken-service.yaml
+#   kubectl run curl -n clinicflow-lab --rm -it --image=curlimages/curl --restart=Never -- curl -m3 patient-portal
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: clinicflow-lab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-portal
+  namespace: clinicflow-lab
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: patient-portal }
+  template:
+    metadata:
+      labels: { app: patient-portal, tier: web }
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.29-alpine
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-portal
+  namespace: clinicflow-lab
+spec:
+  selector: { app: patient-portl, tier: web }
+  ports:
+    - { name: http, port: 80, targetPort: http }

@@ -1,0 +1,10 @@
+# Container image scanning (both images). The pipeline fails on HIGH or CRITICAL findings that
+# have a fix available: blocking on CVEs nobody can patch yet would stop every build without
+# making anything safer. Note: ignore-unfixed must sit under "vulnerability:" - at the top level
+# Trivy silently ignores it.
+severity: [HIGH, CRITICAL]
+exit-code: 1
+scan:
+  scanners: [vuln, secret]
+vulnerability:
+  ignore-unfixed: true

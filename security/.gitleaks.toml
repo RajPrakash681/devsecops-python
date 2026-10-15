@@ -1,0 +1,12 @@
+# Secret scanning. Extends the default ruleset; the allowlist covers only documented demo values.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Demo-only values that are documented as such"
+regexes = [
+  '''clinicflow-demo-password''',   # helm/clinicflow/values.yaml - local cluster only, overridden in prod
+  '''clinicflow-dev''',             # docker-compose default, overridable via .env
+  '''change-me''',                  # .env.example placeholders
+]
+paths = ['''frontend/package-lock\.json''']
