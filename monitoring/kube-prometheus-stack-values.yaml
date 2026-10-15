@@ -1,0 +1,65 @@
+# kube-prometheus-stack (Prometheus Operator, Prometheus, Alertmanager, Grafana, node-exporter,
+# kube-state-metrics) for the 3-node kind cluster used in this project.
+#
+#   kubectl create namespace monitoring
+#   kubectl -n monitoring create secret generic grafana-admin \
+#     --from-literal=admin-user=admin --from-literal=admin-password="$(openssl rand -base64 18)"
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+#     -n monitoring -f monitoring/kube-prometheus-stack-values.yaml
+
+# kind runs the control-plane components with their metrics bound to 127.0.0.1 inside the node,
+# so Prometheus cannot reach them. Left enabled they show as permanently DOWN and fire false
+# alerts (KubeSchedulerDown, KubeControllerManagerDown, etcd...). EKS hides them too.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [prometheus.clinicflow.local]
+  prometheusSpec:
+    retention: 3d
+    scrapeInterval: 15s
+    # Pick up ServiceMonitors / PrometheusRules from ANY namespace, not only objects labelled
+    # with this Helm release - otherwise the ClinicFlow chart's monitors would be ignored.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 200m, memory: 400Mi }
+      limits: { memory: 1Gi }
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 20m, memory: 48Mi }
+
+grafana:
+  # Credentials come from a Secret created at install time (see the top of this file) -
+  # never from this file, which is committed.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [grafana.clinicflow.local]
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard     # the ClinicFlow chart ships its dashboard with this label
+      searchNamespace: ALL
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 20m, memory: 64Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
