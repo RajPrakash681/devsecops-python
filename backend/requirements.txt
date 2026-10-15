@@ -1,9 +1,11 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-psycopg[binary]==3.2.3
-pydantic-settings==2.7.1
-prometheus-fastapi-instrumentator==7.0.2
-alembic==1.14.0
-pytest==8.3.4
-httpx==0.28.1
+# Runtime dependencies only - this is what goes into the image.
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.4
+alembic==1.20.0
+psycopg[binary]==3.3.6
+pydantic==2.14.0
+prometheus-client==0.26.0
+prometheus-fastapi-instrumentator==8.1.0
+# IANA time zones for CLINIC_TZ: the slim base image does not ship the system tz database.
+tzdata==2026.1

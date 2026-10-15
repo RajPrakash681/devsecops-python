@@ -1,6 +1,7 @@
+tests/
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
 .venv/
-test.db
-.git/
+.env
