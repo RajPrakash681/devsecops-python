@@ -1,0 +1,40 @@
+# Migration race test: three pods run `alembic upgrade head` against an EMPTY database at the same
+# moment, exactly as three new backend replicas would. Expected: one pod applies the migrations,
+# the other two wait on the Postgres advisory lock, find the schema current, and exit 0.
+#
+#   kubectl exec -n clinicflow clinicflow-postgres-0 -- psql -U clinicflow -c 'DROP DATABASE IF EXISTS racetest' -c 'CREATE DATABASE racetest'
+#   sed "s/IMAGE_TAG/<commit-sha>/" scripts/migration-race-job.yaml | kubectl apply -n clinicflow -f -
+#   kubectl logs -n clinicflow -l job-name=migration-race --prefix
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migration-race
+spec:
+  parallelism: 3
+  completions: 3
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: ghcr.io/rajprakash681/clinicflow-backend:IMAGE_TAG
+          command: ["sh", "-c", "python -m app.wait_for_db && alembic upgrade head && echo \"$(hostname) exit $?\""]
+          env:
+            - { name: DB_HOST, value: clinicflow-postgres }
+            - { name: DB_NAME, value: racetest }
+            - { name: DB_USER, value: clinicflow }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: clinicflow-db, key: DB_PASSWORD } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+            limits: { cpu: "1", memory: 256Mi }
