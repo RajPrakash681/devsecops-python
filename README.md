@@ -340,13 +340,13 @@ between the scan and the push, so the image that was pushed was never the one th
 |---|---|---|
 | [#1](https://github.com/RajPrakash681/devsecops-python/actions/runs/38745731599) | `8baee13` | ✅ 11/11 jobs, 3m 1s, first run |
 | [#2](https://github.com/RajPrakash681/devsecops-python/actions/runs/38751588093) | `ec4ec2e` | ✅ 11/11 jobs, 3m 26s; Argo CD deployed it automatically |
-| [#3](RUN3_URL) | `RUN3_SHA` | RUN3_RESULT (the change made live in the demo video) |
+| [#3](https://github.com/RajPrakash681/devsecops-python/actions/runs/38760376972) | `9b327be` | ✅ 11/11 jobs, 3m 23s: the change pushed live in the demo video (opening hours under the logo), deployed by Argo CD |
 
 ![pipeline](screenshots/m5-10-github-actions-pipeline.png)
 
 Published images (public): [clinicflow-backend](https://github.com/RajPrakash681/devsecops-python/pkgs/container/clinicflow-backend)
 and [clinicflow-frontend](https://github.com/RajPrakash681/devsecops-python/pkgs/container/clinicflow-frontend),
-one SHA tag per pipeline run:
+one SHA tag per pipeline run (three runs, three tags, no `latest`):
 
 | Backend | Frontend |
 |---|---|
