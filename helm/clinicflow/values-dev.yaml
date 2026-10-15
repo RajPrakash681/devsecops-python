@@ -1,0 +1,10 @@
+# Laptop / quick checks: one replica each, no autoscaling, no Prometheus Operator objects.
+backend:
+  replicaCount: 1
+  autoscaling: { enabled: false }
+frontend:
+  replicaCount: 1
+podDisruptionBudget:
+  enabled: false
+monitoring:
+  enabled: false

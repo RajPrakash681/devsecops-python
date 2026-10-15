@@ -1,4 +1,11 @@
+# Bootstrap: the application namespace. Helm installs everything else into it.
+#   kubectl apply -f k8s/namespace.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: taskboard
+  name: clinicflow
+  labels:
+    app.kubernetes.io/part-of: clinicflow
+    # Pod Security Admission: reject any pod that runs as root or asks for extra privileges.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

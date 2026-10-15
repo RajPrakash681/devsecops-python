@@ -1,0 +1,10 @@
+apiVersion: v2
+name: clinicflow
+description: ClinicFlow clinic appointment booking - React frontend, FastAPI backend, PostgreSQL
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords: [clinic, appointments, fastapi, react, postgresql]
+maintainers:
+  - name: Raj Prakash
+    url: https://github.com/RajPrakash681

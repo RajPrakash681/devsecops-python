@@ -1,0 +1,55 @@
+{{- if .Values.monitoring.enabled }}
+{{- $ns := .Release.Namespace }}
+{{- $job := printf "%s-backend" (include "cf.name" .) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "cf.name" . }}
+  labels: {{- include "cf.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: clinicflow.availability
+      rules:
+        - alert: ClinicFlowBackendDown
+          expr: absent(up{job="{{ $job }}", namespace="{{ $ns }}"} == 1)
+          for: 1m
+          labels: { severity: critical }
+          annotations: { summary: "No healthy ClinicFlow backend pod is being scraped" }
+        - alert: ClinicFlowHighErrorRate
+          expr: |
+            (sum(rate(http_requests_total{job="{{ $job }}", namespace="{{ $ns }}", status="5xx"}[5m])) or vector(0))
+              / clamp_min(sum(rate(http_requests_total{job="{{ $job }}", namespace="{{ $ns }}"}[5m])), 1e-9) > 0.05
+          for: 2m
+          labels: { severity: warning }
+          annotations: { summary: "More than 5% of API requests fail with 5xx" }
+        - alert: ClinicFlowSlowRequests
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="{{ $job }}", namespace="{{ $ns }}"}[5m]))) > 0.5
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "API p95 latency above 500 ms" }
+        - alert: ClinicFlowAutoscalerAtMax
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="{{ $ns }}", horizontalpodautoscaler="{{ $job }}"}
+              >= kube_horizontalpodautoscaler_spec_max_replicas{namespace="{{ $ns }}", horizontalpodautoscaler="{{ $job }}"}
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "Backend HPA at its maximum for 10 minutes - raise maxReplicas or add nodes" }
+    - name: clinicflow.business
+      rules:
+        # every backend pod reports the same DB-derived value, hence max()
+        - alert: ClinicFlowHighNoShowRate
+          expr: max(clinic_no_show_ratio_30d{namespace="{{ $ns }}"}) > 0.2
+          for: 30m
+          labels: { severity: info }
+          annotations: { summary: "{{ "{{" }} $value | humanizePercentage {{ "}}" }} of patients missed their appointment in the last 30 days - consider SMS reminders" }
+        - alert: ClinicFlowWaitingRoomFull
+          expr: max(clinic_patients_waiting{namespace="{{ $ns }}"}) >= 8
+          for: 15m
+          labels: { severity: warning }
+          annotations: { summary: "{{ "{{" }} $value {{ "}}" }} patients have been checked in and waiting for 15 minutes" }
+        - alert: ClinicFlowDoubleBookingAttempts
+          expr: sum(increase(clinic_booking_conflicts_total{namespace="{{ $ns }}"}[15m])) > 10
+          labels: { severity: info }
+          annotations: { summary: "Many bookings hit an already-taken slot - the desk may be working from a stale view" }
+{{- end }}

@@ -1,0 +1,66 @@
+# ClinicFlow - default values (local kind cluster / classroom)
+
+backend:
+  image:
+    repository: ghcr.io/rajprakash681/clinicflow-backend
+    tag: ""                     # set per deploy: the commit SHA the pipeline pushed (never "latest")
+    pullPolicy: IfNotPresent
+  replicaCount: 2               # used when autoscaling is off; the HPA minimum is also 2
+  env:
+    APP_ENV: dev
+    CLINIC_TZ: Asia/Kolkata
+  # Start-up runs three Python processes (wait-for-db, alembic, uvicorn), which is CPU-heavy.
+  # A 1-core limit lets it burst; the request stays small because scheduling and the HPA
+  # percentage are both based on the request.
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: "1", memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 60
+
+frontend:
+  image:
+    repository: ghcr.io/rajprakash681/clinicflow-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { cpu: 200m, memory: 96Mi }
+
+postgres:
+  enabled: true                 # false = use externalDatabase (e.g. Amazon RDS)
+  image: postgres:17-alpine
+  database: clinicflow
+  username: clinicflow
+  # DEMO VALUE ONLY. Real deployments set existingSecret to a Secret managed outside Git
+  # (Sealed Secrets / External Secrets / AWS Secrets Manager) with key DB_PASSWORD.
+  password: clinicflow-demo-password
+  existingSecret: ""
+  storage:
+    size: 1Gi
+    storageClassName: ""        # "" = cluster default
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+externalDatabase:
+  host: ""
+  port: 5432
+
+imagePullSecrets: []
+
+ingress:
+  enabled: true
+  className: nginx
+  host: clinicflow.local
+  annotations: {}
+
+podDisruptionBudget:
+  enabled: true
+
+monitoring:
+  enabled: true                 # ServiceMonitor, PrometheusRule and the Grafana dashboard ConfigMap

@@ -1,0 +1,15 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- range $c := list "backend" "frontend" }}
+---
+# Node drains and upgrades may evict only one pod of each tier at a time.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cf.name" $ }}-{{ $c }}
+  labels: {{- include "cf.labels" $ | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "cf.selector" (dict "ctx" $ "component" $c) | nindent 6 }}
+{{- end }}
+{{- end }}

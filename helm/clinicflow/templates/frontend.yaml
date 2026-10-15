@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cf.name" . }}-frontend
+  labels:
+    {{- include "cf.labels" . | nindent 4 }}
+    {{- include "cf.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  revisionHistoryLimit: 5
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels: {{- include "cf.selector" (dict "ctx" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cf.selector" (dict "ctx" . "component" "frontend") | nindent 8 }}
+        app.kubernetes.io/version: {{ .Values.frontend.image.tag | trunc 12 | quote }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "cf.podSecurity" . | nindent 8 }}
+        runAsUser: 101
+      containers:
+        - name: frontend
+          image: {{ include "cf.image" (dict "image" .Values.frontend.image "component" "frontend") | quote }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: BACKEND_URL, value: "http://{{ include "cf.name" . }}-backend:8000" }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          securityContext: {{- include "cf.containerSecurity" . | nindent 12 }}
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            # read-only root FS: nginx renders its config and writes pid/temp files here
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: conf, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cf.name" . }}-frontend
+  labels:
+    {{- include "cf.labels" . | nindent 4 }}
+    {{- include "cf.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "cf.selector" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  ports:
+    - { name: http, port: 80, targetPort: http }

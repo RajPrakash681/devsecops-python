@@ -1,0 +1,15 @@
+{{- if .Values.monitoring.enabled }}
+# The Prometheus Operator (kube-prometheus-stack) turns this into a scrape job for every backend pod.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "cf.name" . }}-backend
+  labels: {{- include "cf.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+{{- end }}

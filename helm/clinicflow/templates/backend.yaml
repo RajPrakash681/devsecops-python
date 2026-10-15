@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cf.name" . }}-backend
+  labels:
+    {{- include "cf.labels" . | nindent 4 }}
+    {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}   # with the HPA on, the HPA owns this number
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }   # never drop below the current capacity
+  selector:
+    matchLabels: {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 8 }}
+        app.kubernetes.io/version: {{ .Values.backend.image.tag | trunc 12 | quote }}
+      annotations:
+        # env vars are read once at start-up: roll the pods whenever config or credentials change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "cf.podSecurity" . | nindent 8 }}
+        runAsUser: 10001
+      containers:
+        - name: backend
+          image: {{ include "cf.image" (dict "image" .Values.backend.image "component" "backend") | quote }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: {{ include "cf.name" . }}-backend }
+          env:
+            - { name: APP_VERSION, value: {{ .Values.backend.image.tag | trunc 7 | quote }} }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "cf.secretName" . }}, key: DB_PASSWORD } }
+          # Start-up waits for the DB and runs migrations: give it time before liveness counts.
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+          securityContext: {{- include "cf.containerSecurity" . | nindent 12 }}
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cf.name" . }}-backend
+  labels:
+    {{- include "cf.labels" . | nindent 4 }}
+    {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "cf.selector" (dict "ctx" . "component" "backend") | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http }

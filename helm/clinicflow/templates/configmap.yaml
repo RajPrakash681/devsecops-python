@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cf.name" . }}-backend
+  labels: {{- include "cf.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.backend.env }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  DB_HOST: {{ include "cf.dbHost" . | quote }}
+  DB_PORT: {{ .Values.externalDatabase.port | default 5432 | quote }}
+  DB_NAME: {{ .Values.postgres.database | quote }}
+  DB_USER: {{ .Values.postgres.username | quote }}

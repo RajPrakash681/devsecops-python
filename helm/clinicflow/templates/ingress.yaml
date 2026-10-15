@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+# One hostname, two backends - the browser only ever talks to {{ .Values.ingress.host }}:
+#   /api, /docs, /openapi.json  -> FastAPI backend
+#   /                           -> React frontend (nginx)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "cf.name" . }}
+  labels: {{- include "cf.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # ingress-nginx rejects dots in Prefix/Exact paths, so the file path is ImplementationSpecific
+          {{- range $path, $type := dict "/api" "Prefix" "/docs" "Prefix" "/openapi.json" "ImplementationSpecific" }}
+          - path: {{ $path }}
+            pathType: {{ $type }}
+            backend:
+              service: { name: {{ include "cf.name" $ }}-backend, port: { name: http } }
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "cf.name" . }}-frontend, port: { name: http } }
+{{- end }}
