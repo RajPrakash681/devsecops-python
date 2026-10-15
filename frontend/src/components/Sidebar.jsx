@@ -11,7 +11,10 @@ export default function Sidebar({ view, onView, info }) {
         <span className="brand-mark">✚</span>
         <div>
           <b>ClinicFlow</b>
-          <small>Front desk</small>
+          <small>
+            Front desk
+            {info && ` · ${String(info.opening_hour).padStart(2, "0")}:00–${info.closing_hour}:00`}
+          </small>
         </div>
       </div>
       <nav>
