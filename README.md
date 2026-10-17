@@ -27,7 +27,7 @@
 | **Kubernetes** | Helm chart: backend + frontend Deployments (2 replicas each), PostgreSQL StatefulSet + PVC, ClusterIP Services, Ingress, HPA 2–6, PDBs |
 | **GitOps** | Argo CD watches `main` and syncs the cluster to the SHA the pipeline promoted (auto-sync, prune, self-heal) |
 | **Observability** | `/metrics` with clinic business metrics, ServiceMonitor, 7 alert rules, a 19-panel Grafana dashboard shipped as code |
-| **Infrastructure** | Terraform: AWS VPC (2 public + 2 private subnets, NAT), EKS 1.34 + managed node group in `ap-south-1`, 23 resources. Run against the moto AWS emulator, not a real account; see [§12](#12-m7--terraform-aws-vpc--eks) |
+| **Infrastructure** | Terraform: AWS VPC (2 public + 2 private subnets, NAT), EKS 1.34 + managed node group in `ap-south-1`, 23 resources. **Applied on real AWS** with a minimal config (1 × t3.small, no NAT), checked in the AWS Console, then destroyed; the full config was rehearsed on the moto emulator. See [§12](#12-m7--terraform-aws-vpc--eks) |
 
 ![ClinicFlow day schedule](screenshots/m1-01-app-dashboard.png)
 
@@ -134,7 +134,7 @@ flowchart LR
     ghcr -- image pull --> app
     user([Browser]) --> ing
 
-    subgraph tf["Terraform -> AWS ap-south-1 (applied on moto)"]
+    subgraph tf["Terraform -> AWS ap-south-1 (applied, then destroyed)"]
         vpc["VPC: 2 public + 2 private subnets<br/>IGW, NAT, routes"] --> eks["EKS 1.34 + node group"]
     end
 ```
@@ -161,7 +161,7 @@ flowchart LR
 | Containers | Docker, Docker Compose, multi-stage builds |
 | CI/CD | GitHub Actions, GitHub Container Registry, kind (`helm/kind-action`) |
 | Security | Trivy 0.75, Gitleaks 8.30, Bandit 1.9, npm audit, Pod Security Admission (restricted) |
-| Infrastructure | Terraform 1.16, AWS provider 6.69; moto 5.1 as the AWS endpoint ([§12](#12-m7--terraform-aws-vpc--eks)) |
+| Infrastructure | Terraform 1.16, AWS provider 6.69, AWS `ap-south-1`; moto 5.1 for the rehearsal ([§12](#12-m7--terraform-aws-vpc--eks)) |
 | Kubernetes | kind (3 nodes, Kubernetes 1.34), Helm 3.22, ingress-nginx, metrics-server |
 | GitOps | Argo CD 3.5 (argo-cd chart 10.10.5) |
 | Observability | kube-prometheus-stack 92.8 (Prometheus, Alertmanager, Grafana, kube-state-metrics, node-exporter), prometheus-fastapi-instrumentator |
@@ -390,12 +390,15 @@ Other layers:
 
 ## 12. M7 — Terraform (AWS VPC + EKS)
 
-> **Honest scope.** I don't have an AWS account, so this module ran against **moto**, an AWS API
-> emulator, in Docker. The Terraform code, the plan, the 23 resources, the apply, the state and
-> the destroy are all real Terraform; the AWS endpoint is local. That means **there is no AWS
-> Console screenshot**. In its place, the real AWS CLI queries the emulated account. Nothing was
-> created or billed in a real AWS account. The same code runs on real AWS unchanged; the steps are
-> below.
+> **Two runs.** The same Terraform code ran twice:
+> 1. **On real AWS** (`ap-south-1`) on 16–17 October 2026, with a **minimal configuration** to keep
+>    the cost under a dollar: one `t3.small` node and no NAT gateway, so the node runs in a public
+>    subnet. It was applied, checked with `kubectl` and the AWS Console, then **destroyed**.
+> 2. Earlier, the **full configuration** (NAT gateway, 2 × `t3.medium` in the private subnets,
+>    23 resources) was rehearsed against **moto**, an AWS API emulator in Docker. The demo video and
+>    the `m7-*` screenshots show that rehearsal; the `aws-*` screenshots below are the real run.
+>
+> The account ID is masked in every screenshot; nothing else is edited.
 
 [`terraform/`](terraform/) provisions, in **`ap-south-1`**, with plain resources rather than
 community modules, so every object in the plan is visible in [`main.tf`](terraform/main.tf).
@@ -409,9 +412,9 @@ The course's own Terraform didn't parse: whole blocks were written on one line.
 | IGW, NAT gateway + Elastic IP, 2 route tables, 4 associations | public → IGW, private → NAT (`enable_nat_gateway`) |
 | IAM | cluster role (`AmazonEKSClusterPolicy`); node role (worker, CNI, ECR read-only) |
 | **EKS 1.34** | public + private endpoint, public access limited by `api_allowed_cidrs`, creator gets cluster admin |
-| **Managed node group** | `t3.medium` × 2 (min 1, max 3), on-demand, in the **private** subnets |
+| **Managed node group** | default `t3.medium` × 2 (min 1, max 3), on-demand, in the **private** subnets |
 
-**On real AWS:**
+**How to run it:**
 
 ```bash
 cd terraform
@@ -422,9 +425,64 @@ aws eks update-kubeconfig --region ap-south-1 --name clinicflow-eks
 terraform destroy                                   # always, right after the evaluation
 ```
 
-**What I ran (moto):** [`terraform/emulator/run.sh`](terraform/emulator/run.sh) starts moto,
+### The real run: AWS `ap-south-1`
+
+The `terraform.tfvars` for this run (git-ignored) set `enable_nat_gateway = false`,
+`node_instance_types = ["t3.small"]` and a node group of 1/1/1, and limited the public API
+endpoint to my IP. The credentials came from an IAM user's access key held outside the repository.
+
+**`terraform init`, `validate`, `plan`:** 20 to add. The full configuration's NAT gateway,
+Elastic IP and private default route are left out.
+
+![real terraform plan](screenshots/aws-01-terraform-plan.png)
+
+**`terraform apply`:** 20 resources in **11 m 26 s**: the EKS control plane took 8 m 59 s and the
+node group 2 m 11 s.
+
+![real terraform apply](screenshots/aws-02-terraform-apply.png)
+
+**AWS Console: the VPC** (`clinicflow-eks-vpc`, `10.21.0.0/16`, region Asia Pacific (Mumbai)) and
+its resource map: four subnets across `ap-south-1a` and `ap-south-1b`, with the public and private
+route tables.
+
+| VPC list | VPC resource map |
+|---|---|
+| ![console vpc](screenshots/aws-03-console-vpc-list.png) | ![console resource map](screenshots/aws-04-console-vpc-resource-map.png) |
+
+![console subnets](screenshots/aws-05-console-subnets.png)
+
+**AWS Console: the EKS cluster** `clinicflow-eks`, Active on Kubernetes 1.34, and its managed node
+group `clinicflow-eks-default` (desired size 1, Active).
+
+| Cluster | Node group |
+|---|---|
+| ![console eks](screenshots/aws-06-console-eks-cluster.png) | ![console nodegroup](screenshots/aws-07-console-eks-nodegroup.png) |
+
+*The console shows "Pods/Nodes: Data unavailable" because the screenshots were taken from a
+read-only federated console session that has no Kubernetes API access. The node is visible
+through `kubectl` below, as the cluster admin.*
+
+**`kubectl` on the real cluster:** the `t3.small` node is `Ready` on v1.34.11 (Amazon Linux 2023);
+`aws-node`, `coredns` and `kube-proxy` are Running; the cluster is ACTIVE with its API limited to
+one `/32`; the node group is 1/1/1 on-demand.
+
+![kubectl on eks](screenshots/aws-08-kubectl-nodes-eks.png)
+
+**`terraform destroy`:** the first attempt removed 12 resources, including the node group, then
+lost the network mid-run (`dial tcp: lookup eks.ap-south-1.amazonaws.com: no such host`) and stopped
+with the EKS control plane, the VPC, the subnets and the cluster role still in place. Terraform's
+state recorded exactly what was left, so re-running `terraform destroy` removed the remaining 8 in
+3 minutes. The AWS API then confirmed: state empty, no cluster, no tagged VPC or subnets, no node
+instances or EKS network interfaces, and both IAM roles gone.
+
+![real terraform destroy](screenshots/aws-09-terraform-destroy.png)
+
+### The rehearsal: full configuration on the moto emulator
+
+[`terraform/emulator/run.sh`](terraform/emulator/run.sh) starts moto,
 copies in a provider override (`*_override.tf`, git-ignored, deleted on exit) that points the AWS
 endpoints at `localhost:5050` with dummy credentials, and passes its arguments to `terraform`.
+This is the run shown in the demo video.
 
 **`terraform init`, `validate`, `plan`:** 23 to add, 0 to change, 0 to destroy.
 
@@ -434,10 +492,9 @@ endpoints at `localhost:5050` with dummy credentials, and passes its arguments t
 
 ![terraform apply](screenshots/m7-16-terraform-apply-outputs.png)
 
-**Inventory instead of the Console.** These come from the real AWS CLI
-([`emulator/aws.sh`](terraform/emulator/aws.sh)) querying the emulated account: the VPC, four
-subnets in two AZs (public ones map public IPs), the NAT gateway in a public subnet, and the two
-route tables (public → IGW, private → NAT).
+**Inventory from the AWS CLI** ([`emulator/aws.sh`](terraform/emulator/aws.sh)) querying the
+emulated account: the VPC, four subnets in two AZs (public ones map public IPs), the NAT gateway
+in a public subnet, and the two route tables (public → IGW, private → NAT).
 
 ![vpc](screenshots/m7-17-vpc-subnets-routes.png)
 
@@ -628,16 +685,18 @@ Problems found by running the system, and what I changed:
    bookings) were drawn on top of the 2xx series and read like hundreds of 4xx per second
    during the load test. That panel is no longer stacked.
 7. **The emulator has limits.** moto does not store an EKS cluster's `accessConfig`, so the CLI
-   returned `None` for the authentication mode. I left that field out of the evidence rather than
-   show a value that only reflects the emulator.
+   returned `None` for the authentication mode. I left that field out of the emulator evidence
+   rather than show a value that only reflects the emulator. On real AWS the same query returned
+   `API_AND_CONFIG_MAP`, the mode `main.tf` sets.
 
 ---
 
 ## 17. Known issues and limitations
 
-- **No real AWS run.** M7 ran against the moto emulator (§12): no AWS Console screenshots, and the
-  application ran on a local kind cluster, not on the EKS cluster the Terraform defines. Running
-  it on real AWS needs an account and the commands in §12, about 15 minutes plus `terraform destroy`.
+- **The real AWS run was minimal and short-lived.** The VPC and EKS cluster were created on real
+  AWS with one `t3.small` node and no NAT gateway, checked, and destroyed again (§12). The full
+  configuration (NAT gateway, 2 × `t3.medium` in private subnets) was only exercised on the moto
+  emulator, and ClinicFlow itself ran on a local kind cluster, not on EKS.
 - **No authentication.** ClinicFlow assumes a trusted front-desk network; there are no logins or
   roles. Patient names and phone numbers are personal data, so a real deployment needs auth
   (e.g. OIDC at the Ingress) and TLS first.
@@ -660,7 +719,8 @@ Problems found by running the system, and what I changed:
 - **[`ClinicFlow-demo.mp4`](demo/ClinicFlow-demo.mp4)**, the presentation video. It starts with the
   slides (what I built, the architecture), then walks through the codebase, triggers a push and
   follows the GitHub Actions run end to end, then shows Terraform (plan/apply output and the
-  emulated-AWS inventory), Argo CD syncing the new commit, `kubectl get pods,svc,ingress`, the
+  emulated-AWS inventory from the moto rehearsal; the real AWS run came afterwards and is in §12),
+  Argo CD syncing the new commit, `kubectl get pods,svc,ingress`, the
   Prometheus targets page and the live Grafana dashboard. It is a raw screen recording made with
   Playwright, with no audio; a caption in the corner names what each part shows.
 - **[`ClinicFlow-presentation.pptx`](demo/ClinicFlow-presentation.pptx)** and
@@ -693,7 +753,7 @@ Live demo script:
 | backend Dockerfile; frontend multi-stage; non-root | [§9](#9-m4--docker) |
 | Workflow on push to `main`; pytest; frontend build; both images; GHCR with SHA tags | [§10](#10-m5--cicd-github-actions) |
 | Trivy on both images, fails on HIGH/CRITICAL; CVE explained; no secrets committed | [§11](#11-m6--devsecops-trivy) |
-| `terraform plan`, VPC + EKS, `terraform destroy`, `tfvars.example` | [§12](#12-m7--terraform-aws-vpc--eks) (moto emulator, no Console) |
+| `terraform plan`, VPC + EKS, `terraform destroy`, `tfvars.example` | [§12](#12-m7--terraform-aws-vpc--eks) (real AWS run with Console screenshots, plus the moto rehearsal) |
 | `k8s/namespace.yaml`, Helm chart, `helm upgrade --install`, 2+2 replicas, ClusterIP, Ingress, pods Running, `helm list` | [§13](#13-m8--kubernetes-helm-and-gitops) |
 | `/metrics`, Prometheus targets UP, Grafana with live panels | [§14](#14-m9--observability-prometheus--grafana) |
 | README with all technical sections; video and slides in `demo/` | this file; [§18](#18-m10--presentation-and-demo) |
